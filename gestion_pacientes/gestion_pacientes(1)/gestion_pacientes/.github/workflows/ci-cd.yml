@@ -1,0 +1,43 @@
+name: Pipeline de Integracion y Entrega Continua - SaludPlus
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  auditoria-y-construccion:
+    runs-on: ubuntu-latest
+    steps:
+    # 1. Descargar el código actual del repositorio público
+    - name: Clonar repositorio
+      uses: actions/checkout@v3
+    
+    # 2. Configurar Java JDK 21 (versión de SaludPlus)
+    - name: Configurar Java JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+        
+    # 3. Compilar y ejecutar pruebas automatizadas (IE6)
+    # Si los tests fallan aquí, el pipeline se congela de inmediato
+    - name: Compilar y ejecutar Pruebas Unitarias
+      run: ./mvnw clean verify
+
+    # 4. Escaneo obligatorio de SonarQube para cumplimiento normativo (IE5)
+    - name: Analisis de Codigo con SonarQube
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+    # 5. Freno de emergencia automatizado (IE6)
+    # Revisa el Quality Gate. Si no cumple la calidad o seguridad, rompe el pipeline.
+    - name: Verificar Limites de Calidad (Quality Gate)
+      uses: sonarsource/sonarqube-quality-gate-action@master
+      timeout-minutes: 5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
